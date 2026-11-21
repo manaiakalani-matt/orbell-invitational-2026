@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbell Invitational 2026</title>
+<meta name="description" content="Results, player stats and talking points from the Orbell Invitational, Mt Wellington Darts Club W6 Championship 2026.">
+<meta property="og:title" content="Orbell Invitational 2026">
+<meta property="og:description" content="Every match, every leg and every stat from the W6 Championship night.">
+<meta property="og:image" content="img/logo.png">
+<link rel="icon" href="img/logo.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+/* Minimal stand-in for the dashboard runtime: loads the JSON files, works out the calcs, runs the drawings. */
+window.dash = (() => {
+  const files = { players: 'data/players.json', matches: 'data/matches.json', legs: 'data/legs.json', leg_players: 'data/leg_players.json', visits: 'data/visits.json' };
+  const store = {}, calcs = {}, draws = {}; let failed = false;
+  const status = (id) => failed ? 'error' : 'loading';
+  function data(id) {
+    if (store[id]) return { status: 'ok', data: store[id] };
+    const c = calcs[id];
+    if (c && c.inputs.every((i) => data(i).status === 'ok')) {
+      try { store[id] = c.fn(...c.inputs.map((i) => data(i).data)); return { status: 'ok', data: store[id] }; }
+      catch (e) { console.error(id, e); return { status: 'error', data: null }; }
+    }
+    return { status: status(id), data: c ? null : [] };
+  }
+  function run(name) {
+    const fn = draws[name]; if (!fn) return;
+    document.querySelectorAll(`[data-draw="${name}"]`).forEach((el) => {
+      if (el.closest('[hidden]')) return;
+      try { fn(el); } catch (e) { console.error('draw ' + name, e); }
+    });
+  }
+  const runAll = () => Object.keys(draws).forEach(run);
+  Promise.all(Object.entries(files).map(([id, url]) => fetch(url).then((r) => { if (!r.ok) throw new Error(url); return r.json(); }).then((j) => { store[id] = j; })))
+    .then(runAll).catch((e) => { console.error(e); failed = true; runAll(); });
+  let t; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(runAll, 150); });
+  document.addEventListener('DOMContentLoaded', () => {
+    const mo = new MutationObserver(() => runAll());
+    document.querySelectorAll('section.page').forEach((s) => mo.observe(s, { attributes: true, attributeFilter: ['hidden'] }));
+  });
+  return {
+    data, calc: (id, def) => { calcs[id] = def; },
+    draw: (name, fn) => { if (fn) { draws[name] = fn; if (document.readyState !== 'loading') run(name); } else run(name); },
+    setLink: (id) => { try { history.replaceState(null, '', '#' + id); } catch (e) {} },
+    onData: (fn) => fn(), params: () => ({}), setParams: () => {}
+  };
+})();
+</script>
+</head>
+<body>
+<div id="dash-root">
+<style>
+html, body { margin: 0; background: #141415; }
+/* Layout: club-night programme. Charcoal ground, one hot orange, photos carry the colour. Tabs: Overview / Players / Results / Stats */
+.w6 {
+  --bg: #141415; --panel: #1e1e20; --panel2: #28282b; --line: #36363a;
+  --fg: #f4f1ec; --muted: #a39f99; --or: #f47b20; --or-soft: rgba(244,123,32,.16); --light: #d9d3ca;
+  --win: #63c27f; --loss: #e36a5f;
+  --disp: "Avenir Next", "Montserrat", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color-scheme: dark; background: var(--bg); color: var(--fg); font-family: var(--body);
+  font-size: 15px; line-height: 1.45; min-height: 100%;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 56px;
+}
+.w6 * { box-sizing: border-box; }
+.w6 [hidden] { display: none !important; }
+.w6 .wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+.w6 .num, .w6 table { font-variant-numeric: tabular-nums; }
+.w6 h1, .w6 h2, .w6 h3 { font-family: var(--disp); text-wrap: balance; margin: 0; }
+.w6 h2 { font-size: 1.05rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.w6 h2 em { font-style: normal; color: var(--or); }
+.w6 .sub { color: var(--muted); font-size: .88rem; margin: 4px 0 0; max-width: 70ch; }
+.w6 .eyebrow { font-size: .72rem; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.w6 button { font: inherit; color: inherit; }
+.w6 :focus-visible { outline: 2px solid var(--or); outline-offset: 2px; }
+
+/* hero */
+.w6 .hero { position: relative; margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: 28px max(16px, env(safe-area-inset-left, 0px)) 22px;
+  background: linear-gradient(115deg, transparent 0 55%, rgba(244,123,32,.10) 55% 56%, transparent 56% 63%, rgba(244,123,32,.07) 63% 63.6%, transparent 63.6%), linear-gradient(180deg, #1b1b1d, var(--bg));
+  border-bottom: 1px solid var(--line); }
+.w6 .hero-in { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: center; }
+.w6 .logo { width: 104px; height: 104px; }
+.w6 .hero h1 { font-size: clamp(1.9rem, 5vw, 3.1rem); font-weight: 800; line-height: 1; text-transform: uppercase; letter-spacing: .01em; }
+.w6 .hero h1 span { color: var(--or); display: block; }
+.w6 .hero .meta { margin-top: 10px; color: var(--muted); font-size: .9rem; letter-spacing: .06em; }
+.w6 .takeaway { margin: 14px 0 0; font-size: 1.05rem; max-width: 62ch; }
+.w6 .takeaway b { color: var(--or); font-weight: 700; }
+@media (max-width: 560px) { .w6 .hero-in { grid-template-columns: 1fr; } .w6 .logo { width: 72px; height: 72px; } }
+
+/* tabs */
+.w6 .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.w6 .tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 14px; cursor: pointer; font-family: var(--disp);
+  font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: .82rem; color: var(--muted); }
+.w6 .tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--or); }
+.w6 .tab:hover { color: var(--fg); }
+.w6 section.page { display: grid; gap: 34px; }
+
+/* blocks */
+.w6 .block { display: grid; gap: 14px; min-width: 0; align-content: start; }
+@media (min-width: 900px) { .w6 #match-detail { position: sticky; top: 12px; align-self: start; } }
+.w6 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+.w6 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; }
+
+/* champion + tiles */
+.w6 .champ { display: grid; grid-template-columns: 150px 1fr; gap: 18px; align-items: end; background: linear-gradient(135deg, var(--or-soft), transparent 60%), var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.w6 .champ img { width: 150px; height: 190px; object-fit: cover; object-position: 50% 12%; display: block; }
+.w6 .champ .txt { padding: 16px 16px 18px 0; display: grid; gap: 4px; }
+.w6 .champ .name { font-family: var(--disp); font-size: clamp(1.6rem, 4vw, 2.3rem); font-weight: 800; text-transform: uppercase; line-height: 1; }
+.w6 .champ .nick { color: var(--or); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; }
+.w6 .champ .line { color: var(--muted); font-size: .9rem; }
+.w6 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.w6 .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; }
+.w6 .tile b { font-family: var(--disp); font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+.w6 .tile span { color: var(--muted); font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+
+/* bracket */
+.w6 .bracket { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 40px; align-items: center; }
+.w6 .bracket .col { display: grid; gap: 14px; }
+.w6 .bm { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; text-align: left; padding: 0; width: 100%; }
+.w6 .bm:hover { border-color: var(--or); }
+.w6 .bm .lab { display: flex; justify-content: space-between; padding: 6px 12px; font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); background: var(--panel2); }
+.w6 .bm .row { display: grid; grid-template-columns: 34px 1fr auto 30px; gap: 10px; align-items: center; padding: 8px 12px; }
+.w6 .bm .row + .row { border-top: 1px solid var(--line); }
+.w6 .bm .row.lose { color: var(--muted); }
+.w6 .bm .row .sc { font-family: var(--disp); font-size: 1.3rem; font-weight: 800; text-align: right; }
+.w6 .bm .row.win .sc { color: var(--or); }
+.w6 .bm .row .av { font-size: .78rem; color: var(--muted); }
+@media (max-width: 640px) { .w6 .bracket { grid-template-columns: 1fr; } }
+
+.w6 .ava { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: 50% 14%; background: var(--panel2); display: block; }
+
+/* tables */
+.w6 .tscroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.w6 table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.w6 th, .w6 td { padding: 8px 10px; text-align: right; white-space: nowrap; }
+.w6 th:first-child, .w6 td:first-child { text-align: left; }
+.w6 thead th { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); background: var(--panel2); position: sticky; top: 0; }
+.w6 tbody tr + tr td { border-top: 1px solid rgba(255,255,255,.05); }
+.w6 tbody tr:hover td { background: rgba(255,255,255,.025); }
+.w6 .q { background: rgba(244,123,32,.08); }
+.w6 .pos { color: var(--win); } .w6 .neg { color: var(--loss); }
+.w6 th[data-sort] { cursor: pointer; }
+.w6 th[aria-sort="descending"]::after { content: " ↓"; color: var(--or); }
+.w6 th[aria-sort="ascending"]::after { content: " ↑"; color: var(--or); }
+.w6 .pcell { display: flex; align-items: center; gap: 8px; }
+.w6 .pcell .ava { width: 26px; height: 26px; }
+.w6 .linky { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.w6 .linky:hover { color: var(--or); }
+
+/* highlights */
+.w6 .hls { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 12px; }
+.w6 .hl { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.w6 .hl h3 { font-size: .72rem; letter-spacing: .16em; text-transform: uppercase; color: var(--or); font-weight: 700; }
+.w6 .hl .v { font-family: var(--disp); font-size: 2rem; font-weight: 800; line-height: 1.1; margin: 2px 0 0; }
+.w6 .hl .who { font-weight: 700; margin: 0; }
+.w6 .hl .d { color: var(--muted); font-size: .84rem; margin: 0; }
+
+/* charts */
+.w6 .chart { position: relative; min-height: 120px; }
+.w6 .chart svg { display: block; width: 100%; overflow: visible; }
+.w6 .chart text { fill: var(--muted); font-size: 11px; font-family: var(--body); }
+.w6 .chart .lbl { fill: var(--fg); font-size: 12px; }
+.w6 .chart .val { fill: var(--fg); font-size: 11px; font-weight: 600; }
+.w6 .grid line { stroke: rgba(255,255,255,.07); }
+.w6 .tip { position: absolute; pointer-events: none; background: #0c0c0d; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: .8rem; line-height: 1.35; box-shadow: 0 6px 20px rgba(0,0,0,.45); z-index: 5; max-width: 240px; white-space: pre-line; }
+.w6 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: .8rem; color: var(--muted); }
+.w6 .legend i { display: inline-block; width: 12px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
+/* players */
+.w6 .pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(46%, 150px), 1fr)); gap: 10px; }
+.w6 .pc { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; padding: 0; cursor: pointer; text-align: left; display: grid; }
+.w6 .pc img { width: 100%; aspect-ratio: 4/4.4; object-fit: cover; object-position: 50% 12%; display: block; max-width: 100%; }
+.w6 .pc .t { padding: 8px 10px 10px; display: grid; gap: 1px; }
+.w6 .pc .n { font-family: var(--disp); font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.w6 .pc .k { font-size: .7rem; color: var(--or); letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+.w6 .pc .s { font-size: .78rem; color: var(--muted); }
+.w6 .pc[aria-pressed="true"] { border-color: var(--or); box-shadow: 0 0 0 1px var(--or); }
+.w6 .profile { display: grid; grid-template-columns: 230px 1fr; gap: 22px; align-items: start; }
+.w6 .profile .ph { width: 100%; max-width: 230px; aspect-ratio: 230/300; object-fit: cover; object-position: 50% 10%; border-radius: 12px; display: block; background: var(--panel2); }
+.w6 .profile .who { display: grid; gap: 4px; margin-bottom: 14px; }
+.w6 .profile .who .full { font-family: var(--disp); font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 800; text-transform: uppercase; line-height: 1.05; }
+.w6 .profile .who .nick { color: var(--or); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: .82rem; }
+.w6 .profile .who .gear { color: var(--muted); font-size: .85rem; }
+.w6 .pill { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--or-soft); color: var(--or); font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; justify-self: start; }
+.w6 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.w6 .sgroup { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.w6 .sgroup h3 { font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
+.w6 dl { margin: 0; display: grid; gap: 3px; }
+.w6 dl div { display: flex; justify-content: space-between; gap: 10px; font-size: .88rem; }
+.w6 dt { color: var(--muted); }
+.w6 dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.w6 dl div.big dd { font-family: var(--disp); font-size: 1.35rem; color: var(--or); }
+.w6 .ctl { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: .85rem; color: var(--muted); }
+.w6 .ctl select { background-color: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; }
+@media (max-width: 680px) { .w6 .profile { grid-template-columns: 1fr; } .w6 .profile .ph { max-width: 180px; } }
+
+/* results */
+.w6 .mlist { display: grid; gap: 6px; }
+.w6 .mrow { display: grid; grid-template-columns: 74px 1fr 64px 1fr; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; cursor: pointer; text-align: left; width: 100%; }
+.w6 .mrow:hover, .w6 .mrow[aria-pressed="true"] { border-color: var(--or); }
+.w6 .mrow .tag { font-size: .7rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; line-height: 1.2; }
+.w6 .mrow .side { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.w6 .mrow .side.b { justify-content: flex-end; text-align: right; }
+.w6 .mrow .side .nm { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.w6 .mrow .side .av { font-size: .75rem; color: var(--muted); }
+.w6 .mrow .side.l .nm { font-weight: 400; color: var(--muted); }
+.w6 .mrow .ava { width: 28px; height: 28px; flex: none; }
+.w6 .mrow .score { font-family: var(--disp); font-weight: 800; font-size: 1.15rem; text-align: center; }
+@media (max-width: 560px) { .w6 .mrow { grid-template-columns: 1fr 52px 1fr; } .w6 .mrow .tag { grid-column: 1 / -1; } .w6 .mrow .ava { display: none; } }
+.w6 .mhead { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+.w6 .mhead .pl { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.w6 .mhead .pl img { width: 92px; height: 110px; object-fit: cover; object-position: 50% 12%; border-radius: 10px; }
+.w6 .mhead .pl .nm { font-family: var(--disp); font-weight: 800; text-transform: uppercase; }
+.w6 .mhead .pl .av { color: var(--muted); font-size: .82rem; }
+.w6 .mhead .mid { text-align: center; display: grid; gap: 2px; }
+.w6 .mhead .big { font-family: var(--disp); font-size: 2.6rem; font-weight: 800; line-height: 1; }
+.w6 .mhead .mid .tag { color: var(--muted); font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; }
+.w6 .legbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+.w6 .legbtns button { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: .82rem; }
+.w6 .legbtns button[aria-pressed="true"] { background: var(--or); border-color: var(--or); color: #1a1006; font-weight: 700; }
+
+/* h2h */
+.w6 .h2h td { text-align: center; }
+.w6 .h2h td.self { background: var(--panel2); }
+.w6 .h2h .w { color: var(--win); font-weight: 700; } .w6 .h2h .l { color: var(--loss); }
+.w6 .h2h .k { font-size: .68rem; color: var(--or); display: block; }
+.w6 .foot { color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); padding-top: 14px; }
+.w6 .foot summary { cursor: pointer; color: var(--fg); }
+@media (prefers-reduced-motion: no-preference) { .w6 .pc, .w6 .mrow, .w6 .bm { transition: border-color .15s ease; } }
+@media print { .w6 .tabs { display: none; } }
+</style>
+
+<div class="w6">
+  <header class="hero" id="top">
+    <div class="hero-in">
+      <img class="logo" src="img/logo.png" alt="Mt Wellington Darts Club logo">
+      <div>
+        <div class="eyebrow">Mt Wellington Darts Club · Wednesday 6 · The annual</div>
+        <h1>Orbell <span>Invitational</span></h1>
+        <div class="meta">W6 Championship 2026 · Saturday 21 November · 7 players · 501 double in, double out</div>
+        <p class="takeaway" id="takeaway"><b data-draw="tk-champ" data-source="matches" data-field="winner" data-where="stage=Final">—</b> took the title, beating <b data-draw="tk-runner" data-source="matches" data-field="loser" data-where="stage=Final">—</b> <span data-draw="tk-final">—</span> in the final and finishing the night <b data-draw="tk-record">—</b> in matches. Tournament average: <b data-draw="tk-avg" data-source="totals" data-field="avg" data-row="0">—</b>.</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <nav class="tabs" role="tablist" aria-label="Dashboard sections">
+      <button class="tab" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+      <button class="tab" role="tab" data-tab="players" aria-selected="false">Players</button>
+      <button class="tab" role="tab" data-tab="results" aria-selected="false">Results</button>
+      <button class="tab" role="tab" data-tab="stats" aria-selected="false">Stats</button>
+    </nav>
+
+    <!-- ===================== OVERVIEW ===================== -->
+    <section class="page" id="overview">
+      <div class="grid2">
+        <div class="block" id="champion">
+          <h2>The <em>champion</em></h2>
+          <div class="champ">
+            <img data-draw="champ-photo" alt="">
+            <div class="txt">
+              <span class="pill">Orbell Invitational 2026</span>
+              <span class="name" data-draw="champ-name" data-source="matches" data-field="winner" data-where="stage=Final">—</span>
+              <span class="nick" data-draw="champ-nick">—</span>
+              <span class="line">Matches <b data-draw="champ-stat" data-k="won" data-source="player_stats" data-field="won">—</b>–<b data-draw="champ-stat" data-k="lost" data-source="player_stats" data-field="lost">—</b> · Legs <b data-draw="champ-stat" data-k="legs_won" data-source="player_stats" data-field="legs_won">—</b>–<b data-draw="champ-stat" data-k="legs_lost" data-source="player_stats" data-field="legs_lost">—</b> · Average <b data-draw="champ-stat" data-k="avg" data-source="player_stats" data-field="avg">—</b></span>
+            </div>
+          </div>
+        </div>
+        <div class="block" id="numbers">
+          <h2>The night in <em>numbers</em></h2>
+          <div class="tiles">
+            <div class="tile"><b data-draw="tot" data-k="matches" data-source="totals" data-field="matches" data-row="0">—</b><span>Matches</span></div>
+            <div class="tile"><b data-draw="tot" data-k="legs" data-source="totals" data-field="legs" data-row="0">—</b><span>Legs</span></div>
+            <div class="tile"><b data-draw="tot" data-k="darts" data-source="totals" data-field="darts" data-row="0">—</b><span>Darts thrown</span></div>
+            <div class="tile"><b data-draw="tot" data-k="tons" data-source="totals" data-field="tons" data-row="0">—</b><span>100+ visits</span></div>
+            <div class="tile"><b data-draw="tot" data-k="one80s" data-source="totals" data-field="one80s" data-row="0">—</b><span>180s</span></div>
+            <div class="tile"><b data-draw="tot" data-k="high_checkout" data-source="totals" data-field="high_checkout" data-row="0">—</b><span>Top checkout</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="block" id="knockouts">
+        <h2>Knockout <em>bracket</em></h2>
+        <p class="sub">Top four from pool play. Semi-finals were best of 5, the final best of 7. Tap a match to see every leg.</p>
+        <div class="bracket" data-draw="bracket" data-source="matches">—</div>
+      </div>
+
+      <div class="block" id="highlights">
+        <h2>Talking <em>points</em></h2>
+        <div class="hls">
+          <article class="hl" id="hl-best-match"><h3>Performance of the night</h3><p class="v" data-draw="hl" data-k="best_match" data-p="shown" data-source="highlights" data-field="shown" data-where="key=best_match">—</p><p class="who" data-draw="hl" data-k="best_match" data-p="who" data-source="highlights" data-field="who" data-where="key=best_match">—</p><p class="d" data-draw="hl" data-k="best_match" data-p="detail" data-source="highlights" data-field="detail" data-where="key=best_match">—</p></article>
+          <article class="hl" id="hl-unbeaten"><h3>Best record</h3><p class="v" data-draw="hl" data-k="unbeaten" data-p="shown" data-source="highlights" data-field="shown" data-where="key=unbeaten">—</p><p class="who" data-draw="hl" data-k="unbeaten" data-p="who" data-source="highlights" data-field="who" data-where="key=unbeaten">—</p><p class="d" data-draw="hl" data-k="unbeaten" data-p="detail" data-source="highlights" data-field="detail" data-where="key=unbeaten">—</p></article>
+          <article class="hl" id="hl-checkout"><h3>Highest checkout</h3><p class="v" data-draw="hl" data-k="hi_checkout" data-p="shown" data-source="highlights" data-field="shown" data-where="key=hi_checkout">—</p><p class="who" data-draw="hl" data-k="hi_checkout" data-p="who" data-source="highlights" data-field="who" data-where="key=hi_checkout">—</p><p class="d" data-draw="hl" data-k="hi_checkout" data-p="detail" data-source="highlights" data-field="detail" data-where="key=hi_checkout">—</p></article>
+          <article class="hl" id="hl-checkin"><h3>Highest check-in</h3><p class="v" data-draw="hl" data-k="hi_checkin" data-p="shown" data-source="highlights" data-field="shown" data-where="key=hi_checkin">—</p><p class="who" data-draw="hl" data-k="hi_checkin" data-p="who" data-source="highlights" data-field="who" data-where="key=hi_checkin">—</p><p class="d" data-draw="hl" data-k="hi_checkin" data-p="detail" data-source="highlights" data-field="detail" data-where="key=hi_checkin">—</p></article>
+          <article class="hl" id="hl-180s"><h3>180s</h3><p class="v" data-draw="hl" data-k="one80s" data-p="shown" data-source="highlights" data-field="shown" data-where="key=one80s">—</p><p class="who" data-draw="hl" data-k="one80s" data-p="who" data-source="highlights" data-field="who" data-where="key=one80s">—</p><p class="d" data-draw="hl" data-k="one80s" data-p="detail" data-source="highlights" data-field="detail" data-where="key=one80s">—</p></article>
+          <article class="hl" id="hl-fastest"><h3>Quickest leg</h3><p class="v" data-draw="hl" data-k="fastest_leg" data-p="shown" data-source="highlights" data-field="shown" data-where="key=fastest_leg">—</p><p class="who" data-draw="hl" data-k="fastest_leg" data-p="who" data-source="highlights" data-field="who" data-where="key=fastest_leg">—</p><p class="d" data-draw="hl" data-k="fastest_leg" data-p="detail" data-source="highlights" data-field="detail" data-where="key=fastest_leg">—</p></article>
+          <article class="hl" id="hl-marathon"><h3>The marathon</h3><p class="v" data-draw="hl" data-k="marathon" data-p="shown" data-source="highlights" data-field="shown" data-where="key=marathon">—</p><p class="who" data-draw="hl" data-k="marathon" data-p="who" data-source="highlights" data-field="who" data-where="key=marathon">—</p><p class="d" data-draw="hl" data-k="marathon" data-p="detail" data-source="highlights" data-field="detail" data-where="key=marathon">—</p></article>
+          <article class="hl" id="hl-snowman"><h3>Stuck on 501</h3><p class="v" data-draw="hl" data-k="stuck" data-p="shown" data-source="highlights" data-field="shown" data-where="key=stuck">—</p><p class="who" data-draw="hl" data-k="stuck" data-p="who" data-source="highlights" data-field="who" data-where="key=stuck">—</p><p class="d" data-draw="hl" data-k="stuck" data-p="detail" data-source="highlights" data-field="detail" data-where="key=stuck">—</p></article>
+          <article class="hl" id="hl-bull"><h3>Bull rule specialist</h3><p class="v" data-draw="hl" data-k="bull" data-p="shown" data-source="highlights" data-field="shown" data-where="key=bull">—</p><p class="who" data-draw="hl" data-k="bull" data-p="who" data-source="highlights" data-field="who" data-where="key=bull">—</p><p class="d" data-draw="hl" data-k="bull" data-p="detail" data-source="highlights" data-field="detail" data-where="key=bull">—</p></article>
+          <article class="hl" id="hl-comebacks"><h3>Comebacks</h3><p class="v" data-draw="hl" data-k="comebacks" data-p="shown" data-source="highlights" data-field="shown" data-where="key=comebacks">—</p><p class="who" data-draw="hl" data-k="comebacks" data-p="who" data-source="highlights" data-field="who" data-where="key=comebacks">—</p><p class="d" data-draw="hl" data-k="comebacks" data-p="detail" data-source="highlights" data-field="detail" data-where="key=comebacks">—</p></article>
+          <article class="hl" id="hl-upsets"><h3>Won on grit</h3><p class="v" data-draw="hl" data-k="upsets" data-p="shown" data-source="highlights" data-field="shown" data-where="key=upsets">—</p><p class="who" data-draw="hl" data-k="upsets" data-p="who" data-source="highlights" data-field="who" data-where="key=upsets">—</p><p class="d" data-draw="hl" data-k="upsets" data-p="detail" data-source="highlights" data-field="detail" data-where="key=upsets">—</p></article>
+          <article class="hl" id="hl-deciders"><h3>Down to the wire</h3><p class="v" data-draw="hl" data-k="deciders" data-p="shown" data-source="highlights" data-field="shown" data-where="key=deciders">—</p><p class="who" data-draw="hl" data-k="deciders" data-p="who" data-source="highlights" data-field="who" data-where="key=deciders">—</p><p class="d" data-draw="hl" data-k="deciders" data-p="detail" data-source="highlights" data-field="detail" data-where="key=deciders">—</p></article>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="block" id="pool-table">
+          <h2>Pool play <em>table</em></h2>
+          <p class="sub">Everyone played everyone once, best of 3. Top four went through. Ties split on leg difference, then head-to-head.</p>
+          <div class="tscroll">
+            <table data-source="player_stats" data-row-key="name">
+              <thead><tr><th data-field="name">Player</th><th data-field="pool_won">W</th><th data-field="pool_lost">L</th><th data-field="pool_legs_for">Legs +</th><th data-field="pool_legs_against">Legs −</th><th data-field="pool_leg_diff">Diff</th><th data-field="pool_avg">Avg</th></tr></thead>
+              <tbody data-draw="pooltable"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="block" id="averages">
+          <h2>Three-dart <em>averages</em></h2>
+          <p class="sub">The official n01 average counts every dart, including the visits spent trying to check in. The second bar starts counting from each player's first scoring visit in a leg.</p>
+          <div class="legend"><span><i style="background:var(--or)"></i>Official average</span><span><i style="background:var(--light)"></i>Average after check-in</span></div>
+          <div class="chart" data-draw="avgchart" data-source="player_stats" style="min-height:260px">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== PLAYERS ===================== -->
+    <section class="page" id="players" hidden>
+      <div class="block">
+        <h2>The <em>field</em></h2>
+        <div class="pgrid" data-draw="pgrid" data-source="players player_stats">—</div>
+      </div>
+
+      <div class="block" id="profile">
+        <div class="profile">
+          <img class="ph" data-draw="p-photo" alt="">
+          <div>
+            <div class="who">
+              <span class="pill" data-draw="p-info" data-k="finish" data-source="players" data-field="finish">—</span>
+              <span class="full" data-draw="p-info" data-k="full_name" data-source="players" data-field="full_name">—</span>
+              <span class="nick" data-draw="p-info" data-k="nickname" data-source="players" data-field="nickname">—</span>
+              <span class="gear">Throws <span data-draw="p-info" data-k="darts" data-source="players" data-field="darts">—</span></span>
+            </div>
+            <div class="stats">
+              <div class="sgroup"><h3>Results</h3><dl>
+                <div class="big"><dt>Matches won</dt><dd><span data-draw="p-stat" data-k="won" data-source="player_stats" data-field="won">—</span>–<span data-draw="p-stat" data-k="lost" data-source="player_stats" data-field="lost">—</span></dd></div>
+                <div><dt>Legs won–lost</dt><dd><span data-draw="p-stat" data-k="legs_won" data-source="player_stats" data-field="legs_won">—</span>–<span data-draw="p-stat" data-k="legs_lost" data-source="player_stats" data-field="legs_lost">—</span></dd></div>
+                <div><dt>Pool finish</dt><dd><span data-draw="p-info" data-k="pool_rank" data-source="players" data-field="pool_rank">—</span> of 7</dd></div>
+                <div><dt>Pool legs diff</dt><dd data-draw="p-stat" data-k="pool_leg_diff" data-source="player_stats" data-field="pool_leg_diff">—</dd></div>
+              </dl></div>
+              <div class="sgroup"><h3>Scoring</h3><dl>
+                <div class="big"><dt>3-dart average</dt><dd data-draw="p-stat" data-k="avg" data-f="2" data-source="player_stats" data-field="avg">—</dd></div>
+                <div><dt>After check-in</dt><dd data-draw="p-stat" data-k="avg_after_checkin" data-f="2" data-source="player_stats" data-field="avg_after_checkin">—</dd></div>
+                <div><dt>Best match avg</dt><dd data-draw="p-stat" data-k="best_match_avg" data-f="2" data-source="player_stats" data-field="best_match_avg">—</dd></div>
+                <div><dt>Highest visit</dt><dd data-draw="p-stat" data-k="high_visit" data-source="player_stats" data-field="high_visit">—</dd></div>
+                <div><dt>100+ / 140+ / 180</dt><dd><span data-draw="p-stat" data-k="plus_100" data-source="player_stats" data-field="plus_100">—</span> / <span data-draw="p-stat" data-k="plus_140" data-source="player_stats" data-field="plus_140">—</span> / <span data-draw="p-stat" data-k="one80s" data-source="player_stats" data-field="one80s">—</span></dd></div>
+              </dl></div>
+              <div class="sgroup"><h3>Finishing</h3><dl>
+                <div class="big"><dt>Highest checkout</dt><dd data-draw="p-stat" data-k="high_checkout" data-source="player_stats" data-field="high_checkout">—</dd></div>
+                <div><dt>Average checkout</dt><dd data-draw="p-stat" data-k="avg_checkout" data-f="1" data-source="player_stats" data-field="avg_checkout">—</dd></div>
+                <div><dt>Best leg (darts)</dt><dd data-draw="p-stat" data-k="best_leg" data-source="player_stats" data-field="best_leg">—</dd></div>
+                <div><dt>Darts per leg won</dt><dd data-draw="p-stat" data-k="darts_per_leg_won" data-f="1" data-source="player_stats" data-field="darts_per_leg_won">—</dd></div>
+              </dl></div>
+              <div class="sgroup"><h3>Throw &amp; check-in</h3><dl>
+                <div><dt>Hold % (throwing first)</dt><dd data-draw="p-stat" data-k="hold_pct" data-source="player_stats" data-field="hold_pct">—</dd></div>
+                <div><dt>Break % (throwing second)</dt><dd data-draw="p-stat" data-k="break_pct" data-source="player_stats" data-field="break_pct">—</dd></div>
+                <div><dt>Visits to check in, pool</dt><dd data-draw="p-stat" data-k="checkin_wait_pool" data-f="2" data-source="player_stats" data-field="checkin_wait_pool">—</dd></div>
+                <div><dt>Visits to check in, knockouts</dt><dd data-draw="p-stat" data-k="checkin_wait_ko" data-f="2" data-source="player_stats" data-field="checkin_wait_ko">—</dd></div>
+                <div><dt>Highest check-in</dt><dd data-draw="p-stat" data-k="high_checkin" data-source="player_stats" data-field="high_checkin">—</dd></div>
+              </dl></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="block" id="form">
+          <h2>Form through the <em>night</em></h2>
+          <p class="sub">Match average in the order the games were played. Green dots are wins, red are losses.</p>
+          <div class="chart" data-draw="p-form" data-source="matches" style="min-height:240px">—</div>
+        </div>
+        <div class="block" id="bands">
+          <h2>Where the darts <em>landed</em></h2>
+          <p class="sub">Share of every visit by score. The grey tick is the field's share, for comparison.</p>
+          <div class="chart" data-draw="p-bands" data-source="visits" style="min-height:240px">—</div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="block" id="p-matches-block">
+          <h2>Match <em>results</em></h2>
+          <div class="mlist" data-draw="p-matches" data-source="matches"></div>
+        </div>
+        <div class="block" id="p-checkouts-block">
+          <h2>Every <em>checkout</em></h2>
+          <div class="tscroll">
+            <table><thead><tr><th>Checkout</th><th>Darts</th><th>Against</th><th>Match · leg</th></tr></thead><tbody data-draw="p-checkouts" data-source="legs"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== RESULTS ===================== -->
+    <section class="page" id="results" hidden>
+      <div class="grid2">
+        <div class="block" id="match-list">
+          <h2>All <em>matches</em></h2>
+          <div class="ctl">
+            <label for="w6-mplayer">Player</label>
+            <select class="dash-select" id="w6-mplayer" aria-label="Filter by player">
+              <option value="">Everyone</option><option>Zac</option><option>Corey</option><option>Matt</option><option>Gabe</option><option>James</option><option>Darren</option><option>Mike</option>
+            </select>
+            <label for="w6-mstage">Stage</label>
+            <select class="dash-select" id="w6-mstage" aria-label="Filter by stage">
+              <option value="">All stages</option><option value="Round Robin">Pool play</option><option value="KO">Knockouts</option>
+            </select>
+          </div>
+          <div class="mlist" data-draw="matchlist" data-source="matches"></div>
+        </div>
+        <div class="block" id="match-detail">
+          <h2>Match <em>detail</em></h2>
+          <div class="card" style="display:grid;gap:16px">
+            <div class="mhead" data-draw="m-head" data-source="matches">—</div>
+            <div class="tscroll">
+              <table><thead><tr><th>Leg</th><th>Threw first</th><th>Winner</th><th>Darts</th><th>Checkout</th><th>Winner avg</th><th>Loser left</th><th>Time</th></tr></thead><tbody data-draw="m-legs" data-source="legs"></tbody></table>
+            </div>
+            <div style="display:grid;gap:8px">
+              <h3 class="eyebrow">Leg replay · score left after each visit</h3>
+              <div class="chart" data-draw="m-replay" data-source="visits" style="min-height:280px">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== STATS ===================== -->
+    <section class="page" id="stats" hidden>
+      <div class="block" id="leaderboard">
+        <h2>Full <em>leaderboard</em></h2>
+        <p class="sub">Every match, including knockouts. Tap a column heading to sort.</p>
+        <div class="tscroll">
+          <table data-source="player_stats" data-row-key="name" id="w6-leaders">
+            <thead><tr>
+              <th data-field="name">Player</th>
+              <th data-field="won" data-sort="won">W</th><th data-field="lost" data-sort="lost">L</th>
+              <th data-field="legs_won" data-sort="legs_won">Legs W</th><th data-field="legs_lost" data-sort="legs_lost">Legs L</th>
+              <th data-field="avg" data-sort="avg" aria-sort="descending">Avg</th><th data-field="avg_after_checkin" data-sort="avg_after_checkin">After check-in</th>
+              <th data-field="best_match_avg" data-sort="best_match_avg">Best match</th>
+              <th data-field="plus_100" data-sort="plus_100">100+</th><th data-field="plus_140" data-sort="plus_140">140+</th><th data-field="one80s" data-sort="one80s">180</th>
+              <th data-field="high_checkout" data-sort="high_checkout">High out</th><th data-field="best_leg" data-sort="best_leg">Best leg</th>
+              <th data-field="hold_pct" data-sort="hold_pct">Hold %</th><th data-field="break_pct" data-sort="break_pct">Break %</th>
+              <th data-field="checkin_wait_pool" data-sort="checkin_wait_pool">Check-in visits (pool)</th><th data-field="high_checkin" data-sort="high_checkin">High check-in</th>
+            </tr></thead>
+            <tbody data-draw="leaders"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="block" id="head-to-head">
+        <h2>Head <em>to head</em></h2>
+        <p class="sub">Row player's legs first. Knockout meetings are marked KO under the pool result.</p>
+        <div class="tscroll"><table class="h2h"><thead data-draw="h2h-head"></thead><tbody data-draw="h2h" data-source="matches"></tbody></table></div>
+      </div>
+
+      <div class="grid2">
+        <div class="block" id="top-checkouts">
+          <h2>Top <em>checkouts</em></h2>
+          <div class="tscroll"><table><thead><tr><th>Checkout</th><th>Player</th><th>Darts</th><th>Against</th><th>Match · leg</th></tr></thead><tbody data-draw="colist" data-source="legs"></tbody></table></div>
+        </div>
+        <div class="block" id="big-visits">
+          <h2>The big <em>ones</em></h2>
+          <p class="sub">Every visit of 140 or more.</p>
+          <div class="tscroll"><table><thead><tr><th>Score</th><th>Player</th><th>Against</th><th>Match · leg · visit</th></tr></thead><tbody data-draw="bigvisits" data-source="visits"></tbody></table></div>
+        </div>
+      </div>
+
+      <details class="foot" id="notes">
+        <summary>How these numbers work</summary>
+        <p>All figures come from the n01 scoring records for tournament t_ldpt_2502: every visit of every leg. The 3-dart average is n01's own: points scored divided by darts thrown, times three. Pool play used a bull check-in rule (first three check-in darts at the bull, then any double), so a run of 0 scores at the start of a leg is a player trying to check in. n01 stores one score per visit, so it can't tell which dart hit the double or the bull. "After check-in" averages and check-in visits are worked out from that run of zeros. Leg times come from n01's start and finish timestamps and include walking and scoring time.</p>
+      </details>
+    </section>
+  </div>
+</div>
+
+<script>
+/* shared helpers */
+window.W6 = window.W6 || { player: 'Zac', match: 24, leg: 1, sort: { k: 'avg', d: -1 }, mplayer: '', mstage: '' };
+W6.rows = (id) => { const r = dash.data(id); return r.status === 'ok' ? r.data : null; };
+W6.failed = (...ids) => ids.some((id) => dash.data(id).status === 'error');
+W6.h = (tag, attrs, ...kids) => {
+  const e = document.createElement(tag);
+  for (const k in (attrs || {})) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k === 'onclick') e.addEventListener('click', v);
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  kids.flat().forEach((c) => { if (c == null) return; e.append(c.nodeType ? c : document.createTextNode(String(c))); });
+  return e;
+};
+W6.m = (text, src, field, where, cls) => W6.h('span', { class: cls, 'data-source': src, 'data-field': field, 'data-where': where, text: text == null ? '—' : String(text) });
+W6.f = (v, d) => (v == null || Number.isNaN(v)) ? '—' : (d == null ? String(v) : (+v).toFixed(d));
+W6.mmss = (s) => s == null ? '—' : Math.floor(s / 60) + ':' + String(Math.round(s % 60)).padStart(2, '0');
+W6.photo = (name) => { const p = W6.rows('players'); const r = p && p.find((x) => x.name === name); return r ? r.photo : ''; };
+W6.ava = (name) => W6.h('img', { class: 'ava', src: W6.photo(name), alt: '' });
+W6.placeholder = (el, ...ids) => { el.textContent = W6.failed(...ids) ? "Couldn't load this." : '—'; };
+W6.stageLabel = (m) => m.stage === 'Round Robin' ? `Pool R${m.pool_round} · Board ${m.board}` : m.stage;
+W6.tip = (box) => {
+  let t = box.querySelector('.tip');
+  if (!t) { t = W6.h('div', { class: 'tip', hidden: true }); box.append(t); }
+  return {
+    show(ev, text) { t.textContent = text; t.hidden = false; const r = box.getBoundingClientRect(); let x = ev.clientX - r.left + 12, y = ev.clientY - r.top + 12; const w = t.offsetWidth; if (x + w > r.width) x = Math.max(0, ev.clientX - r.left - w - 12); t.style.left = x + 'px'; t.style.top = y + 'px'; },
+    hide() { t.hidden = true; }
+  };
+};
+W6.goTab = (id) => {
+  document.querySelectorAll('.w6 section.page').forEach((s) => { s.hidden = s.id !== id; });
+  document.querySelectorAll('.w6 .tab').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+  dash.setLink(id);
+};
+W6.showPlayer = (name) => {
+  W6.player = name; W6.goTab('players');
+  ['pgrid', 'p-photo', 'p-info', 'p-stat', 'p-form', 'p-bands', 'p-matches', 'p-checkouts'].forEach((n) => dash.draw(n));
+  const t = document.getElementById('profile'); if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+};
+W6.showMatch = (id) => {
+  W6.match = id; W6.leg = 1; W6.goTab('results');
+  ['matchlist', 'm-head', 'm-legs', 'm-replay'].forEach((n) => dash.draw(n));
+  const t = document.getElementById('match-detail'); if (t && window.innerWidth < 900) t.scrollIntoView({ block: 'start', behavior: 'smooth' });
+};
+</script>
+
+<script>
+/* worked-out figures */
+dash.calc('player_stats', {
+  inputs: ['players', 'matches', 'leg_players', 'visits'],
+  title: 'Player stats',
+  description: "Each player's match, leg, scoring, finishing and check-in figures, worked out from every match, leg and visit.",
+  fn: (players, matches, legPlayers, visits) => {
+    const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
+    const r = (x, d) => (x == null || !isFinite(x)) ? null : Math.round(x * 10 ** d) / 10 ** d;
+    const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+    return players.map((p) => {
+      const n = p.name;
+      const ms = matches.filter((m) => m.player_a === n || m.player_b === n);
+      const me = (m) => (m.player_a === n ? 'a' : 'b'), op = (m) => (m.player_a === n ? 'b' : 'a');
+      const pool = ms.filter((m) => m.stage === 'Round Robin'), ko = ms.filter((m) => m.stage !== 'Round Robin');
+      const avgOf = (a) => a.length ? r(sum(a, (m) => m['points_' + me(m)]) / sum(a, (m) => m['darts_' + me(m)]) * 3, 2) : null;
+      const lp = legPlayers.filter((l) => l.player === n);
+      const won = lp.filter((l) => l.won);
+      const first = lp.filter((l) => l.threw_first), second = lp.filter((l) => !l.threw_first);
+      const vs = visits.filter((v) => v.player === n).map((v) => v.score);
+      const avgs = ms.map((m) => m['avg_' + me(m)]);
+      const ci = lp.filter((l) => l.checkin_score != null).map((l) => l.checkin_score);
+      const poolLp = lp.filter((l) => l.stage === 'Round Robin'), koLp = lp.filter((l) => l.stage !== 'Round Robin');
+      const lf = sum(pool, (m) => m['legs_' + me(m)]), la = sum(pool, (m) => m['legs_' + op(m)]);
+      return {
+        name: n, finish_order: p.finish_order, pool_rank: p.pool_rank,
+        played: ms.length, won: ms.filter((m) => m.winner === n).length, lost: ms.filter((m) => m.loser === n).length,
+        legs_won: sum(ms, (m) => m['legs_' + me(m)]), legs_lost: sum(ms, (m) => m['legs_' + op(m)]),
+        pool_won: pool.filter((m) => m.winner === n).length, pool_lost: pool.filter((m) => m.loser === n).length,
+        pool_legs_for: lf, pool_legs_against: la, pool_leg_diff: lf - la,
+        avg: avgOf(ms), pool_avg: avgOf(pool), ko_avg: avgOf(ko),
+        avg_after_checkin: r(sum(lp, (l) => l.points_after_checkin) / sum(lp, (l) => l.darts_after_checkin) * 3, 2),
+        best_match_avg: Math.max(...avgs), worst_match_avg: Math.min(...avgs),
+        high_visit: Math.max(...vs), plus_60: vs.filter((x) => x >= 60).length, plus_100: vs.filter((x) => x >= 100).length,
+        plus_140: vs.filter((x) => x >= 140).length, one80s: vs.filter((x) => x === 180).length,
+        zero_visits: vs.filter((x) => x === 0).length,
+        checkouts: won.length, high_checkout: won.length ? Math.max(...won.map((l) => l.checkout)) : null,
+        avg_checkout: r(mean(won.map((l) => l.checkout)), 1),
+        best_leg: won.length ? Math.min(...won.map((l) => l.darts)) : null,
+        darts_per_leg_won: r(mean(won.map((l) => l.darts)), 1),
+        legs_first: first.length, holds: first.filter((l) => l.won).length, hold_pct: first.length ? Math.round(first.filter((l) => l.won).length / first.length * 100) : null,
+        legs_second: second.length, breaks: second.filter((l) => l.won).length, break_pct: second.length ? Math.round(second.filter((l) => l.won).length / second.length * 100) : null,
+        checkin_wait_pool: r(mean(poolLp.map((l) => l.zeros_before_checkin)), 2),
+        checkin_wait_ko: r(mean(koLp.map((l) => l.zeros_before_checkin)), 2),
+        high_checkin: ci.length ? Math.max(...ci) : null,
+        never_checked_in: lp.filter((l) => l.checkin_score == null).length
+      };
+    });
+  }
+});
+
+dash.calc('totals', {
+  inputs: ['matches', 'legs', 'visits'],
+  title: 'Tournament totals',
+  description: 'Counts and the overall average across every match, leg and visit.',
+  fn: (matches, legs, visits) => {
+    const pts = matches.reduce((s, m) => s + m.points_a + m.points_b, 0), d = matches.reduce((s, m) => s + m.darts_a + m.darts_b, 0);
+    return [{
+      matches: matches.length, legs: legs.length, darts: d, points: pts, avg: Math.round(pts / d * 300) / 100,
+      tons: visits.filter((v) => v.score >= 100).length, one80s: visits.filter((v) => v.score === 180).length,
+      high_checkout: Math.max(...legs.map((l) => l.checkout))
+    }];
+  }
+});
+
+dash.calc('highlights', {
+  inputs: ['matches', 'legs', 'leg_players', 'visits'],
+  title: 'Talking points',
+  description: 'Standout moments picked out of the matches, legs and visits: records, comebacks and oddities.',
+  fn: (matches, legs, legPlayers, visits) => {
+    const where = (m) => m.stage === 'Round Robin' ? `pool round ${m.pool_round}` : m.stage.toLowerCase();
+    const byId = Object.fromEntries(matches.map((m) => [m.match, m]));
+    const out = [];
+    const perf = matches.flatMap((m) => [{ p: m.player_a, o: m.player_b, a: m.avg_a, m }, { p: m.player_b, o: m.player_a, a: m.avg_b, m }]);
+    const best = perf.reduce((x, y) => (y.a > x.a ? y : x));
+    out.push({ key: 'best_match', shown: best.a.toFixed(2), who: best.p, detail: `Average v ${best.o} in ${where(best.m)} (match ${best.m.match}), ${best.m.winner === best.p ? 'won' : 'lost'} ${Math.max(best.m.legs_a, best.m.legs_b)}–${Math.min(best.m.legs_a, best.m.legs_b)}.` });
+    const names = [...new Set(perf.map((x) => x.p))];
+    const rec = names.map((n) => ({ n, w: matches.filter((m) => m.winner === n).length, l: matches.filter((m) => m.loser === n).length })).sort((a, b) => b.w - a.w || a.l - b.l)[0];
+    const lw = legPlayers.filter((l) => l.player === rec.n && l.won).length, ll = legPlayers.filter((l) => l.player === rec.n && !l.won).length;
+    out.push({ key: 'unbeaten', shown: `${rec.w}–${rec.l}`, who: rec.n, detail: `${rec.l === 0 ? 'Unbeaten all night' : 'Most matches won'}: ${lw} legs won, ${ll} lost.` });
+    const co = legs.reduce((x, y) => (y.checkout > x.checkout ? y : x));
+    out.push({ key: 'hi_checkout', shown: String(co.checkout), who: co.winner, detail: `${co.checkout_darts}-dart finish v ${co.loser}, match ${co.match} leg ${co.leg}.` });
+    const ci = legPlayers.filter((l) => l.checkin_score != null).reduce((x, y) => (y.checkin_score > x.checkin_score ? y : x));
+    out.push({ key: 'hi_checkin', shown: String(ci.checkin_score), who: ci.player, detail: `First score of the leg on visit ${ci.checkin_visit} v ${ci.opponent}, match ${ci.match} leg ${ci.leg}.` });
+    const v180 = visits.filter((v) => v.score === 180);
+    const c180 = {}; v180.forEach((v) => { c180[v.player] = (c180[v.player] || 0) + 1; });
+    out.push({ key: 'one80s', shown: String(v180.length), who: Object.entries(c180).sort((a, b) => b[1] - a[1]).map(([p, c]) => c > 1 ? `${p} ×${c}` : p).join(' · ') || 'None', detail: `Plus ${visits.filter((v) => v.score >= 140 && v.score < 180).length} more visits of 140 or better.` });
+    const fl = legs.reduce((x, y) => (y.winner_darts < x.winner_darts ? y : x));
+    out.push({ key: 'fastest_leg', shown: `${fl.winner_darts} darts`, who: fl.winner, detail: `${byId[fl.match].stage}, leg ${fl.leg} v ${fl.loser}: a ${fl.winner_avg.toFixed(2)} leg average.` });
+    const ml = legs.reduce((x, y) => (y.winner_darts > x.winner_darts ? y : x));
+    out.push({ key: 'marathon', shown: `${ml.winner_darts} darts`, who: `${ml.winner} v ${ml.loser}`, detail: `Match ${ml.match} leg ${ml.leg}${ml.seconds ? `, ${Math.floor(ml.seconds / 60)} min ${ml.seconds % 60} s on the clock` : ''}. ${ml.winner} won it.` });
+    const st = legPlayers.filter((l) => l.checkin_score == null);
+    out.push({ key: 'stuck', shown: String(st.length), who: st.map((l) => l.player).join(' · ') || 'Nobody', detail: st.length ? `Legs that ended with a player still on 501: ${st.map((l) => `${l.player} v ${l.opponent} (match ${l.match})`).join(', ')}.` : 'Everyone checked in every leg.' });
+    const pool = legPlayers.filter((l) => l.stage === 'Round Robin');
+    const wait = names.map((n) => { const a = pool.filter((l) => l.player === n); return { n, w: a.reduce((s, l) => s + l.zeros_before_checkin, 0) / a.length }; }).sort((a, b) => a.w - b.w);
+    out.push({ key: 'bull', shown: wait[0].w.toFixed(2), who: wait[0].n, detail: `Fewest visits per leg before scoring under the pool-play bull rule. The field averaged ${(pool.reduce((s, l) => s + l.zeros_before_checkin, 0) / pool.length).toFixed(2)}.` });
+    const cb = matches.filter((m) => { const l1 = legs.find((l) => l.match === m.match && l.leg === 1); return l1 && l1.winner !== m.winner; });
+    out.push({ key: 'comebacks', shown: String(cb.length), who: [...new Set(cb.map((m) => m.winner))].join(' · '), detail: 'Matches won after losing the first leg.' });
+    const up = matches.filter((m) => (m.winner === m.player_a ? m.avg_a < m.avg_b : m.avg_b < m.avg_a));
+    out.push({ key: 'upsets', shown: String(up.length), who: Object.entries(up.reduce((a, m) => { a[m.winner] = (a[m.winner] || 0) + 1; return a; }, {})).sort((a, b) => b[1] - a[1]).map(([p, c]) => c > 1 ? `${p} ×${c}` : p).join(' · ') || 'Nobody', detail: up.length ? `Wins with the lower average: ${up.map((m) => `${m.winner} over ${m.loser} (match ${m.match})`).join(', ')}.` : 'The better average won every match.' });
+    const dec = matches.filter((m) => Math.min(m.legs_a, m.legs_b) === m.first_to - 1);
+    out.push({ key: 'deciders', shown: `${dec.length} of ${matches.length}`, who: 'Matches to a deciding leg', detail: `${matches.filter((m) => Math.min(m.legs_a, m.legs_b) === 0).length} were whitewashes.` });
+    return out;
+  }
+});
+</script>
+
+<script>
+/* overview drawings */
+dash.draw('tk-champ', (el) => { const m = W6.rows('matches'); const f = m && m.find((x) => x.stage === 'Final'); el.textContent = f ? f.winner : '—'; });
+dash.draw('tk-runner', (el) => { const m = W6.rows('matches'); const f = m && m.find((x) => x.stage === 'Final'); el.textContent = f ? f.loser : '—'; });
+dash.draw('tk-final', (el) => {
+  const m = W6.rows('matches'); const f = m && m.find((x) => x.stage === 'Final');
+  if (!f) { el.textContent = '—'; return; }
+  const w = f.winner === f.player_a ? 'a' : 'b', l = w === 'a' ? 'b' : 'a';
+  el.replaceChildren(W6.m(f['legs_' + w], 'matches', 'legs_' + w, 'match=' + f.match), '–', W6.m(f['legs_' + l], 'matches', 'legs_' + l, 'match=' + f.match));
+});
+dash.draw('tk-record', (el) => {
+  const m = W6.rows('matches'), s = W6.rows('player_stats'); const f = m && m.find((x) => x.stage === 'Final');
+  const r = f && s && s.find((x) => x.name === f.winner);
+  if (!r) { el.textContent = '—'; return; }
+  el.replaceChildren(W6.m(r.won, 'player_stats', 'won', 'name=' + r.name), '–', W6.m(r.lost, 'player_stats', 'lost', 'name=' + r.name));
+});
+dash.draw('tk-avg', (el) => { const t = W6.rows('totals'); el.textContent = t ? t[0].avg.toFixed(2) : '—'; });
+
+W6.champ = () => { const m = W6.rows('matches'); const f = m && m.find((x) => x.stage === 'Final'); return f ? f.winner : null; };
+dash.draw('champ-photo', (el) => { const c = W6.champ(); if (c) { el.src = W6.photo(c); el.alt = c; } });
+dash.draw('champ-name', (el) => { el.textContent = W6.champ() || '—'; });
+dash.draw('champ-nick', (el) => { const p = W6.rows('players'), c = W6.champ(); const r = p && p.find((x) => x.name === c); el.textContent = r ? `“${r.nickname}”` : '—'; });
+dash.draw('champ-stat', (el) => {
+  const s = W6.rows('player_stats'), c = W6.champ(); const r = s && s.find((x) => x.name === c);
+  if (!r) { el.textContent = '—'; return; }
+  el.setAttribute('data-where', 'name=' + c);
+  el.textContent = el.dataset.k === 'avg' ? r.avg.toFixed(2) : String(r[el.dataset.k]);
+});
+dash.draw('tot', (el) => { const t = W6.rows('totals'); el.textContent = t ? String(t[0][el.dataset.k]) : '—'; });
+
+dash.draw('bracket', (el) => {
+  const m = W6.rows('matches');
+  if (!m) { W6.placeholder(el, 'matches'); return; }
+  const card = (x, label) => {
+    const row = (side) => {
+      const n = x['player_' + side], win = x.winner === n;
+      return W6.h('div', { class: 'row ' + (win ? 'win' : 'lose') }, W6.ava(n),
+        W6.h('div', null, W6.h('div', { text: n, style: 'font-weight:700' }), W6.h('div', { class: 'av' }, 'avg ', W6.m(x['avg_' + side].toFixed(2), 'matches', 'avg_' + side, 'match=' + x.match))),
+        W6.h('span'), W6.m(x['legs_' + side], 'matches', 'legs_' + side, 'match=' + x.match, 'sc'));
+    };
+    return W6.h('button', { class: 'bm', type: 'button', onclick: () => W6.showMatch(x.match), 'aria-label': `${label}: ${x.player_a} v ${x.player_b}` },
+      W6.h('div', { class: 'lab' }, W6.h('span', { text: label }), W6.h('span', { text: `${x.minutes} min` })), row('a'), row('b'));
+  };
+  const sfs = m.filter((x) => x.stage === 'Semi-final'), fin = m.find((x) => x.stage === 'Final');
+  el.replaceChildren(W6.h('div', { class: 'col' }, sfs.map((x, i) => card(x, `Semi-final ${i + 1}`))), W6.h('div', { class: 'col' }, fin ? card(fin, 'Final') : null));
+});
+
+dash.draw('hl', (el) => {
+  const h = W6.rows('highlights'); const r = h && h.find((x) => x.key === el.dataset.k);
+  el.textContent = r ? r[el.dataset.p] : (W6.failed('highlights') ? "Couldn't load this." : '—');
+});
+
+dash.draw('pooltable', (el) => {
+  const s = W6.rows('player_stats');
+  if (!s) { el.replaceChildren(); return; }
+  const rows = [...s].sort((a, b) => a.pool_rank - b.pool_rank);
+  el.replaceChildren(...rows.map((r) => W6.h('tr', { class: r.pool_rank <= 4 ? 'q' : null },
+    W6.h('td', null, W6.h('button', { class: 'linky pcell', type: 'button', onclick: () => W6.showPlayer(r.name) }, W6.ava(r.name), W6.h('span', { text: r.name }))),
+    W6.h('td', { text: r.pool_won }), W6.h('td', { text: r.pool_lost }), W6.h('td', { text: r.pool_legs_for }), W6.h('td', { text: r.pool_legs_against }),
+    W6.h('td', { class: r.pool_leg_diff > 0 ? 'pos' : r.pool_leg_diff < 0 ? 'neg' : null, text: (r.pool_leg_diff > 0 ? '+' : '') + r.pool_leg_diff }),
+    W6.h('td', { text: r.pool_avg.toFixed(2) }))));
+});
+
+dash.draw('avgchart', (el) => {
+  const s = W6.rows('player_stats');
+  if (!s) { W6.placeholder(el, 'player_stats'); return; }
+  const rows = [...s].sort((a, b) => b.avg - a.avg);
+  const W = Math.max(280, el.clientWidth), rowH = 34, top = 6, H = top + rows.length * rowH;
+  el.replaceChildren();
+  const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Bar chart of each player\'s official three-dart average and average after check-in');
+  const left = 64, right = 44;
+  const x = d3.scaleLinear().domain([0, Math.max(60, d3.max(rows, (r) => r.avg_after_checkin))]).range([left, W - right]);
+  svg.append('g').attr('class', 'grid').selectAll('line').data(x.ticks(4)).join('line').attr('x1', x).attr('x2', x).attr('y1', 0).attr('y2', H);
+  const tip = W6.tip(el);
+  const g = svg.selectAll('g.r').data(rows).join('g').attr('class', 'r').attr('transform', (d, i) => `translate(0,${top + i * rowH})`);
+  g.append('text').attr('class', 'lbl').attr('x', 0).attr('y', 15).text((d) => d.name);
+  g.append('rect').attr('x', left).attr('y', 4).attr('height', 12).attr('rx', 2).attr('width', (d) => x(d.avg) - left).style('fill', 'var(--or)');
+  g.append('rect').attr('x', left).attr('y', 19).attr('height', 6).attr('rx', 2).attr('width', (d) => x(d.avg_after_checkin) - left).style('fill', 'var(--light)');
+  g.append('text').attr('class', 'val').attr('x', (d) => x(d.avg) + 5).attr('y', 14).text((d) => d.avg.toFixed(2));
+  g.append('text').attr('x', (d) => x(d.avg_after_checkin) + 5).attr('y', 26).text((d) => d.avg_after_checkin.toFixed(2));
+  g.append('rect').attr('x', 0).attr('width', W).attr('height', rowH).style('fill', 'transparent')
+    .on('pointermove', (ev, d) => tip.show(ev, `${d.name}\nOfficial average ${d.avg.toFixed(2)}\nAfter check-in ${d.avg_after_checkin.toFixed(2)}\nBest match ${d.best_match_avg.toFixed(2)}`))
+    .on('pointerleave', () => tip.hide());
+});
+</script>
+
+<script>
+/* players */
+dash.draw('pgrid', (el) => {
+  const p = W6.rows('players'), s = W6.rows('player_stats');
+  if (!p || !s) { W6.placeholder(el, 'players', 'player_stats'); return; }
+  const rows = [...p].sort((a, b) => a.finish_order - b.finish_order);
+  el.replaceChildren(...rows.map((r) => {
+    const st = s.find((x) => x.name === r.name);
+    return W6.h('button', { class: 'pc', type: 'button', 'aria-pressed': String(W6.player === r.name), onclick: () => W6.showPlayer(r.name) },
+      W6.h('img', { src: r.photo, alt: r.full_name }),
+      W6.h('div', { class: 't' }, W6.h('span', { class: 'n', text: r.name }), W6.h('span', { class: 'k', text: r.nickname }),
+        W6.h('span', { class: 's' }, W6.m(st.won, 'player_stats', 'won', 'name=' + r.name), '–', W6.m(st.lost, 'player_stats', 'lost', 'name=' + r.name), ' · avg ', W6.m(st.avg.toFixed(2), 'player_stats', 'avg', 'name=' + r.name))));
+  }));
+});
+dash.draw('p-photo', (el) => { const src = W6.photo(W6.player); if (src) { el.src = src; el.alt = W6.player; } });
+dash.draw('p-info', (el) => {
+  const p = W6.rows('players'); const r = p && p.find((x) => x.name === W6.player);
+  if (!r) { el.textContent = '—'; return; }
+  el.setAttribute('data-where', 'name=' + r.name);
+  const v = r[el.dataset.k];
+  el.textContent = el.dataset.k === 'nickname' ? `“${v}”` : String(v);
+});
+dash.draw('p-stat', (el) => {
+  const s = W6.rows('player_stats'); const r = s && s.find((x) => x.name === W6.player);
+  if (!r) { el.textContent = '—'; return; }
+  el.setAttribute('data-where', 'name=' + r.name);
+  const v = r[el.dataset.k];
+  el.textContent = v == null ? '—' : (el.dataset.k === 'pool_leg_diff' && v > 0 ? '+' + v : W6.f(v, el.dataset.f == null ? null : +el.dataset.f));
+});
+
+dash.draw('p-form', (el) => {
+  const m = W6.rows('matches');
+  if (!m) { W6.placeholder(el, 'matches'); return; }
+  const n = W6.player;
+  const rows = m.filter((x) => x.player_a === n || x.player_b === n).sort((a, b) => a.start.localeCompare(b.start) || a.match - b.match)
+    .map((x, i) => { const s = x.player_a === n ? 'a' : 'b', o = s === 'a' ? 'b' : 'a'; return { i: i + 1, avg: x['avg_' + s], opp: x['player_' + o], won: x.winner === n, score: `${x['legs_' + s]}–${x['legs_' + o]}`, m: x }; });
+  const W = Math.max(280, el.clientWidth), H = 230, mg = { t: 22, r: 14, b: 40, l: 34 };
+  el.replaceChildren();
+  const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', `${n}'s match average in each game, in the order played`);
+  const x = d3.scalePoint().domain(rows.map((d) => d.i)).range([mg.l + 10, W - mg.r - 10]);
+  const y = d3.scaleLinear().domain([0, Math.max(60, d3.max(rows, (d) => d.avg) + 5)]).nice().range([H - mg.b, mg.t]);
+  svg.append('g').attr('class', 'grid').selectAll('line').data(y.ticks(4)).join('line').attr('x1', mg.l).attr('x2', W - mg.r).attr('y1', y).attr('y2', y);
+  svg.append('g').selectAll('text').data(y.ticks(4)).join('text').attr('x', mg.l - 6).attr('y', (d) => y(d) + 4).attr('text-anchor', 'end').text((d) => d);
+  svg.append('path').datum(rows).attr('d', d3.line().x((d) => x(d.i)).y((d) => y(d.avg))).style('fill', 'none').style('stroke', 'var(--or)').style('stroke-width', 2);
+  const tip = W6.tip(el);
+  const g = svg.selectAll('g.pt').data(rows).join('g').attr('class', 'pt').style('cursor', 'pointer').on('click', (ev, d) => W6.showMatch(d.m.match))
+    .on('pointermove', (ev, d) => tip.show(ev, `${d.m.stage === 'Round Robin' ? 'Pool round ' + d.m.pool_round : d.m.stage} v ${d.opp}\n${d.won ? 'Won' : 'Lost'} ${d.score} · avg ${d.avg.toFixed(2)}\nTap to open the match`)).on('pointerleave', () => tip.hide());
+  g.append('circle').attr('cx', (d) => x(d.i)).attr('cy', (d) => y(d.avg)).attr('r', 6).style('fill', (d) => d.won ? 'var(--win)' : 'var(--loss)').style('stroke', 'var(--bg)').style('stroke-width', 2);
+  g.append('text').attr('class', 'val').attr('x', (d) => x(d.i)).attr('y', (d) => y(d.avg) - 11).attr('text-anchor', 'middle').text((d) => d.avg.toFixed(1));
+  g.append('text').attr('x', (d) => x(d.i)).attr('y', H - mg.b + 16).attr('text-anchor', 'middle').text((d) => d.opp);
+  g.append('text').attr('x', (d) => x(d.i)).attr('y', H - mg.b + 30).attr('text-anchor', 'middle').style('fill', 'var(--or)').text((d) => d.m.stage === 'Round Robin' ? '' : d.m.stage === 'Final' ? 'Final' : 'SF');
+});
+
+dash.draw('p-bands', (el) => {
+  const v = W6.rows('visits');
+  if (!v) { W6.placeholder(el, 'visits'); return; }
+  const bands = [[0, 0, '0'], [1, 25, '1–25'], [26, 40, '26–40'], [41, 59, '41–59'], [60, 79, '60–79'], [80, 99, '80–99'], [100, 139, '100–139'], [140, 180, '140+']];
+  const mine = v.filter((x) => x.player === W6.player);
+  const share = (a, b) => a.length ? a.filter((x) => x.score >= b[0] && x.score <= b[1]).length / a.length : 0;
+  const rows = bands.map((b) => ({ label: b[2], p: share(mine, b), f: share(v, b), c: mine.filter((x) => x.score >= b[0] && x.score <= b[1]).length }));
+  const W = Math.max(280, el.clientWidth), rowH = 26, H = rows.length * rowH + 4, left = 62, right = 70;
+  el.replaceChildren();
+  const svg = d3.select(el).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', `Share of ${W6.player}'s visits in each score band, with the field's share for comparison`);
+  const x = d3.scaleLinear().domain([0, Math.max(0.4, d3.max(rows, (d) => Math.max(d.p, d.f)))]).range([left, W - right]);
+  const tip = W6.tip(el);
+  const g = svg.selectAll('g').data(rows).join('g').attr('transform', (d, i) => `translate(0,${i * rowH})`);
+  g.append('text').attr('class', 'lbl').attr('x', 0).attr('y', 16).text((d) => d.label);
+  g.append('rect').attr('x', left).attr('y', 6).attr('height', 13).attr('rx', 2).attr('width', (d) => Math.max(1, x(d.p) - left)).style('fill', 'var(--or)');
+  g.append('line').attr('x1', (d) => x(d.f)).attr('x2', (d) => x(d.f)).attr('y1', 2).attr('y2', 23).style('stroke', 'var(--light)').style('stroke-width', 2);
+  g.append('text').attr('class', 'val').attr('x', (d) => Math.max(x(d.p), x(d.f)) + 6).attr('y', 16).text((d) => `${Math.round(d.p * 100)}% (${d.c})`);
+  g.append('rect').attr('width', W).attr('height', rowH).style('fill', 'transparent')
+    .on('pointermove', (ev, d) => tip.show(ev, `${d.label}: ${d.c} visits\n${W6.player} ${Math.round(d.p * 100)}% · field ${Math.round(d.f * 100)}%`)).on('pointerleave', () => tip.hide());
+});
+
+W6.matchRow = (x, focus) => {
+  const side = (s) => {
+    const n = x['player_' + s], win = x.winner === n;
+    const kids = [W6.ava(n), W6.h('div', { style: 'min-width:0;display:grid' }, W6.h('span', { class: 'nm', text: n }), W6.h('span', { class: 'av' }, W6.m(x['avg_' + s].toFixed(2), 'matches', 'avg_' + s, 'match=' + x.match)))];
+    return W6.h('div', { class: `side ${s} ${win ? 'w' : 'l'}` }, s === 'b' ? kids.reverse() : kids);
+  };
+  return W6.h('button', { class: 'mrow', type: 'button', 'aria-pressed': String(W6.match === x.match), onclick: () => W6.showMatch(x.match) },
+    W6.h('span', { class: 'tag', text: `M${x.match} · ${W6.stageLabel(x)}` }), side('a'),
+    W6.h('span', { class: 'score' }, W6.m(x.legs_a, 'matches', 'legs_a', 'match=' + x.match), '–', W6.m(x.legs_b, 'matches', 'legs_b', 'match=' + x.match)), side('b'));
+};
+dash.draw('p-matches', (el) => {
+  const m = W6.rows('matches');
+  if (!m) { el.replaceChildren(); return; }
+  el.replaceChildren(...m.filter((x) => x.player_a === W6.player || x.player_b === W6.player).map((x) => W6.matchRow(x)));
+});
+dash.draw('p-checkouts', (el) => {
+  const l = W6.rows('legs');
+  if (!l) { el.replaceChildren(); return; }
+  const rows = l.filter((x) => x.winner === W6.player).sort((a, b) => b.checkout - a.checkout);
+  el.replaceChildren(...rows.map((r) => W6.h('tr', null,
+    W6.h('td', null, W6.m(r.checkout, 'legs', 'checkout', 'leg_id=' + r.leg_id)), W6.h('td', null, W6.m(r.checkout_darts, 'legs', 'checkout_darts', 'leg_id=' + r.leg_id)),
+    W6.h('td', { text: r.loser }), W6.h('td', null, W6.h('button', { class: 'linky', type: 'button', onclick: () => W6.showMatch(r.match), text: `M${r.match} · leg ${r.leg}` })))));
+});
+</script>
+
+<script>
+/* results */
+dash.draw('matchlist', (el) => {
+  const m = W6.rows('matches');
+  if (!m) { el.replaceChildren(); return; }
+  const rows = m.filter((x) => (!W6.mplayer || x.player_a === W6.mplayer || x.player_b === W6.mplayer) && (!W6.mstage || (W6.mstage === 'KO' ? x.stage !== 'Round Robin' : x.stage === W6.mstage)));
+  el.replaceChildren(...rows.map((x) => W6.matchRow(x)));
+});
+W6.cur = () => { const m = W6.rows('matches'); return m && m.find((x) => x.match === W6.match); };
+dash.draw('m-head', (el) => {
+  const x = W6.cur();
+  if (!x) { W6.placeholder(el, 'matches'); return; }
+  const pl = (s) => W6.h('div', { class: 'pl' }, W6.h('img', { src: W6.photo(x['player_' + s]), alt: x['player_' + s] }),
+    W6.h('button', { class: 'linky nm', type: 'button', onclick: () => W6.showPlayer(x['player_' + s]), text: x['player_' + s] }),
+    W6.h('span', { class: 'av' }, 'avg ', W6.m(x['avg_' + s].toFixed(2), 'matches', 'avg_' + s, 'match=' + x.match)));
+  el.replaceChildren(pl('a'), W6.h('div', { class: 'mid' }, W6.h('span', { class: 'tag', text: `Match ${x.match} · ${W6.stageLabel(x)}` }),
+    W6.h('span', { class: 'big' }, W6.m(x.legs_a, 'matches', 'legs_a', 'match=' + x.match), '–', W6.m(x.legs_b, 'matches', 'legs_b', 'match=' + x.match)),
+    W6.h('span', { class: 'tag' }, `${x.start} · `, W6.m(x.minutes, 'matches', 'minutes', 'match=' + x.match), ' min · first to ', String(x.first_to))), pl('b'));
+});
+dash.draw('m-legs', (el) => {
+  const l = W6.rows('legs');
+  if (!l) { el.replaceChildren(); return; }
+  const rows = l.filter((x) => x.match === W6.match);
+  el.replaceChildren(...rows.map((r) => {
+    const w = (f, t) => W6.m(t == null ? r[f] : t, 'legs', f, 'leg_id=' + r.leg_id);
+    return W6.h('tr', null, W6.h('td', { text: r.leg }), W6.h('td', null, w('thrower_first')), W6.h('td', { style: 'font-weight:700' }, w('winner'), r.hold ? '' : W6.h('span', { class: 'pos', text: ' break' })),
+      W6.h('td', null, w('winner_darts')), W6.h('td', null, w('checkout'), ` (${r.checkout_darts}d)`), W6.h('td', null, w('winner_avg', r.winner_avg.toFixed(2))),
+      W6.h('td', null, w('loser_left')), W6.h('td', { text: W6.mmss(r.seconds) }));
+  }));
+});
+dash.draw('m-replay', (el) => {
+  const v = W6.rows('visits'), x = W6.cur(), l = W6.rows('legs');
+  if (!v || !x || !l) { W6.placeholder(el, 'visits', 'matches', 'legs'); return; }
+  const legs = l.filter((r) => r.match === x.match);
+  if (!legs.some((r) => r.leg === W6.leg)) W6.leg = 1;
+  const leg = legs.find((r) => r.leg === W6.leg);
+  const btns = W6.h('div', { class: 'legbtns' }, legs.map((r) => W6.h('button', { type: 'button', 'aria-pressed': String(r.leg === W6.leg), onclick: () => { W6.leg = r.leg; dash.draw('m-replay'); }, text: `Leg ${r.leg} · ${r.winner}` })));
+  const cols = { [x.player_a]: 'var(--or)', [x.player_b]: 'var(--light)' };
+  const legend = W6.h('div', { class: 'legend' }, [x.player_a, x.player_b].map((n) => W6.h('span', null, W6.h('i', { style: `background:${cols[n]}` }), n)));
+  const series = [x.player_a, x.player_b].map((n) => ({ n, pts: [{ visit: 0, left: 501, score: null }].concat(v.filter((r) => r.leg_id === leg.leg_id && r.player === n).sort((a, b) => a.visit - b.visit)) }));
+  const box = W6.h('div', { style: 'position:relative' });
+  el.replaceChildren(btns, legend, box);
+  const W = Math.max(280, el.clientWidth), H = 230, mg = { t: 10, r: 14, b: 28, l: 38 };
+  const svg = d3.select(box).append('svg').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', `Score left after each visit in leg ${leg.leg} of ${x.player_a} v ${x.player_b}`);
+  const maxV = d3.max(series, (s) => s.pts.length - 1);
+  const xs = d3.scaleLinear().domain([0, maxV]).range([mg.l, W - mg.r]);
+  const ys = d3.scaleLinear().domain([0, 501]).range([H - mg.b, mg.t]);
+  svg.append('g').attr('class', 'grid').selectAll('line').data([0, 100, 200, 300, 400, 501]).join('line').attr('x1', mg.l).attr('x2', W - mg.r).attr('y1', ys).attr('y2', ys);
+  svg.append('g').selectAll('text').data([0, 100, 200, 300, 400, 501]).join('text').attr('x', mg.l - 6).attr('y', (d) => ys(d) + 4).attr('text-anchor', 'end').text((d) => d);
+  const step = Math.max(1, Math.ceil(maxV / 12));
+  svg.append('g').selectAll('text').data(d3.range(0, maxV + 1, step)).join('text').attr('x', xs).attr('y', H - 8).attr('text-anchor', 'middle').text((d) => d === 0 ? 'start' : d);
+  const tip = W6.tip(box);
+  series.forEach((s) => {
+    svg.append('path').datum(s.pts).attr('d', d3.line().x((d) => xs(d.visit)).y((d) => ys(d.left))).style('fill', 'none').style('stroke', cols[s.n]).style('stroke-width', 2.2);
+    svg.append('g').selectAll('circle').data(s.pts.slice(1)).join('circle').attr('cx', (d) => xs(d.visit)).attr('cy', (d) => ys(d.left)).attr('r', (d) => d.checkout ? 6 : d.score >= 100 ? 4.5 : 3)
+      .style('fill', (d) => d.checkout ? 'var(--win)' : cols[s.n]).style('stroke', 'var(--panel)').style('stroke-width', 1.5)
+      .on('pointermove', (ev, d) => tip.show(ev, `${s.n} · visit ${d.visit}\n${d.checkout ? `Checked out ${d.score} (${d.darts} darts)` : d.score === 0 ? 'No score' : `Scored ${d.score}`}\nLeft ${d.left}`)).on('pointerleave', () => tip.hide());
+  });
+});
+</script>
+
+<script>
+/* stats */
+dash.draw('leaders', (el) => {
+  const s = W6.rows('player_stats');
+  if (!s) { el.replaceChildren(); return; }
+  const k = W6.sort.k, d = W6.sort.d;
+  const rows = [...s].sort((a, b) => ((a[k] ?? -1e9) - (b[k] ?? -1e9)) * d || a.finish_order - b.finish_order);
+  const f2 = ['avg', 'avg_after_checkin', 'best_match_avg', 'checkin_wait_pool'];
+  const cols = ['won', 'lost', 'legs_won', 'legs_lost', 'avg', 'avg_after_checkin', 'best_match_avg', 'plus_100', 'plus_140', 'one80s', 'high_checkout', 'best_leg', 'hold_pct', 'break_pct', 'checkin_wait_pool', 'high_checkin'];
+  el.replaceChildren(...rows.map((r) => W6.h('tr', null,
+    W6.h('td', null, W6.h('button', { class: 'linky pcell', type: 'button', onclick: () => W6.showPlayer(r.name) }, W6.ava(r.name), W6.h('span', { text: r.name }))),
+    cols.map((c) => W6.h('td', { text: r[c] == null ? '—' : f2.includes(c) ? r[c].toFixed(2) : String(r[c]), style: c === k ? 'color:var(--or);font-weight:700' : null })))));
+});
+dash.draw('h2h-head', (el) => {
+  const s = W6.rows('player_stats');
+  if (!s) { el.replaceChildren(); return; }
+  const names = [...s].sort((a, b) => a.finish_order - b.finish_order).map((r) => r.name);
+  el.replaceChildren(W6.h('tr', null, W6.h('th', { text: '' }), names.map((n) => W6.h('th', { text: n }))));
+});
+dash.draw('h2h', (el) => {
+  const s = W6.rows('player_stats'), m = W6.rows('matches');
+  if (!s || !m) { el.replaceChildren(); return; }
+  const names = [...s].sort((a, b) => a.finish_order - b.finish_order).map((r) => r.name);
+  el.replaceChildren(...names.map((p) => W6.h('tr', null, W6.h('td', { style: 'font-weight:700' }, W6.h('button', { class: 'linky', type: 'button', onclick: () => W6.showPlayer(p), text: p })),
+    names.map((q) => {
+      if (p === q) return W6.h('td', { class: 'self' });
+      const ms = m.filter((x) => (x.player_a === p && x.player_b === q) || (x.player_a === q && x.player_b === p));
+      return W6.h('td', null, ms.map((x) => {
+        const sp = x.player_a === p ? 'a' : 'b', sq = sp === 'a' ? 'b' : 'a';
+        return W6.h('button', { class: 'linky ' + (x.winner === p ? 'w' : 'l'), type: 'button', style: 'display:block;margin:0 auto', onclick: () => W6.showMatch(x.match) },
+          x.stage === 'Round Robin' ? null : W6.h('span', { class: 'k', text: x.stage === 'Final' ? 'Final' : 'SF' }),
+          W6.m(x['legs_' + sp], 'matches', 'legs_' + sp, 'match=' + x.match), '–', W6.m(x['legs_' + sq], 'matches', 'legs_' + sq, 'match=' + x.match));
+      }));
+    }))));
+});
+dash.draw('colist', (el) => {
+  const l = W6.rows('legs');
+  if (!l) { el.replaceChildren(); return; }
+  const rows = [...l].sort((a, b) => b.checkout - a.checkout || a.checkout_darts - b.checkout_darts).slice(0, 15);
+  el.replaceChildren(...rows.map((r) => W6.h('tr', null, W6.h('td', { style: 'font-weight:700;color:var(--or)' }, W6.m(r.checkout, 'legs', 'checkout', 'leg_id=' + r.leg_id)),
+    W6.h('td', { text: r.winner }), W6.h('td', null, W6.m(r.checkout_darts, 'legs', 'checkout_darts', 'leg_id=' + r.leg_id)), W6.h('td', { text: r.loser }),
+    W6.h('td', null, W6.h('button', { class: 'linky', type: 'button', onclick: () => W6.showMatch(r.match), text: `M${r.match} · leg ${r.leg}` })))));
+});
+dash.draw('bigvisits', (el) => {
+  const v = W6.rows('visits'), lp = W6.rows('leg_players');
+  if (!v || !lp) { el.replaceChildren(); return; }
+  const opp = (r) => { const x = lp.find((y) => y.leg_id === r.leg_id && y.player === r.player); return x ? x.opponent : ''; };
+  const rows = v.filter((r) => r.score >= 140).sort((a, b) => b.score - a.score || a.match - b.match);
+  el.replaceChildren(...rows.map((r) => W6.h('tr', null, W6.h('td', { style: 'font-weight:700;color:var(--or)', text: r.score }), W6.h('td', { text: r.player }), W6.h('td', { text: opp(r) }),
+    W6.h('td', null, W6.h('button', { class: 'linky', type: 'button', onclick: () => W6.showMatch(r.match), text: `M${r.match} · leg ${r.leg} · visit ${r.visit}` })))));
+});
+</script>
+
+<script>
+/* controls: tabs, filters, sorting, links, print */
+document.querySelectorAll('.w6 .tab').forEach((b) => b.addEventListener('click', () => W6.goTab(b.dataset.tab)));
+const mp = document.getElementById('w6-mplayer'), ms = document.getElementById('w6-mstage');
+if (mp) mp.addEventListener('change', () => { W6.mplayer = mp.value; dash.draw('matchlist'); });
+if (ms) ms.addEventListener('change', () => { W6.mstage = ms.value; dash.draw('matchlist'); });
+document.querySelectorAll('#w6-leaders th[data-sort]').forEach((th) => th.addEventListener('click', () => {
+  const k = th.dataset.sort;
+  W6.sort = { k, d: W6.sort.k === k ? -W6.sort.d : (['lost', 'legs_lost', 'best_leg', 'checkin_wait_pool'].includes(k) ? 1 : -1) };
+  document.querySelectorAll('#w6-leaders th[data-sort]').forEach((t) => { if (t.dataset.sort === k) t.setAttribute('aria-sort', W6.sort.d < 0 ? 'descending' : 'ascending'); else t.removeAttribute('aria-sort'); });
+  dash.draw('leaders');
+}));
+const startTab = (location.hash || '').slice(1);
+if (['overview', 'players', 'results', 'stats'].includes(startTab)) W6.goTab(startTab);
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (['overview', 'players', 'results', 'stats'].includes(h)) W6.goTab(h); });
+let w6Was = null;
+window.addEventListener('beforeprint', () => { w6Was = [...document.querySelectorAll('.w6 section.page')].map((s) => s.hidden); document.querySelectorAll('.w6 section.page').forEach((s) => { s.hidden = false; }); });
+window.addEventListener('afterprint', () => { if (!w6Was) return; document.querySelectorAll('.w6 section.page').forEach((s, i) => { s.hidden = w6Was[i]; }); w6Was = null; });
+</script>
+
+</div>
+</body>
+</html>
